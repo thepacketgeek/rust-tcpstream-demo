@@ -1,4 +1,4 @@
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io::{self, Write};
 use std::net::{SocketAddr, TcpStream};
 
 use structopt::StructOpt;
@@ -14,38 +14,33 @@ struct Args {
     addr: SocketAddr,
 }
 
-/// Client establishes a connection and has Buffered Reader/Writers
-struct TcpClient {
-    reader: BufReader<TcpStream>,
-    writer: BufWriter<TcpStream>,
+/// Send data (bytes) to the server
+pub fn write_data(stream: &mut TcpStream, data: &[u8]) -> io::Result<()> {
+    // Here, `write_all()` attempts to write the entire slice, raising an error if it cannot do so
+    stream.write_all(data)?;
+
+    // An alternative is `write()` which will return the number of bytes that *could*
+    // be sent. This can be used if your app has a mechanism to handle this scenario.
+    // E.g. TCP backpressure for high-bandwidth data
+    //
+    // This is an example of what `write_all()` does:
+    // let bytes_to_write = data.len();
+    // let bytes_written = stream.write(data)?;
+    // if bytes_written < bytes_written {
+    //     return Err(Error::new(ErrorKind::Interrupted, "Could not write all data"));
+    // }
+
+    // Signal that we're done writing and the data should be sent (with TCP PSH bit)
+    stream.flush()
 }
 
-impl TcpClient {
-    /// Establish a connection, wrap stream in BufReader/Writer
-    pub fn connect(dest: SocketAddr) -> io::Result<Self> {
-        let stream = TcpStream::connect(dest)?;
-        eprintln!("Connecting to {}", dest);
-        Ok(Self {
-            reader: BufReader::new(stream.try_clone()?),
-            writer: BufWriter::new(stream),
-        })
-    }
-
-    /// Serialize a request to the server and deserialize the response
-    pub fn send_request(&mut self, message: &str) -> io::Result<String> {
-        self.writer.write_all(&message.as_bytes())?;
-        self.writer.flush()?;
-        extract_string_unbuffered(&mut self.reader)
-    }
-}
-
-fn main() -> Result<(), String> {
+fn main() -> io::Result<()> {
     let args = Args::from_args();
 
-    let resp = TcpClient::connect(args.addr)
-        .and_then(|mut client| client.send_request(&args.message))
-        .map_err(|e| format!("Error sending request: {}", e))?;
+    let mut stream = TcpStream::connect(args.addr)?;
+    write_data(&mut stream, &args.message.as_bytes())?;
 
-    println!("{}", resp);
-    Ok(())
+    // Now read & print the response
+    // (this will block until all data has been received)
+    extract_string_unbuffered(&mut stream).map(|resp| println!("{}", resp))
 }

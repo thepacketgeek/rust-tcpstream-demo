@@ -18,6 +18,9 @@ fn main() -> io::Result<()> {
     let args = Args::from_args();
 
     let stream = TcpStream::connect(args.addr)?;
+
+    // Codec is our interface for reading/writing messages.
+    // No need to handle reading/writing directly
     let mut codec = LinesCodec::new(stream)?;
 
     codec.send_message(&args.message)?;
