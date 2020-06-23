@@ -3,7 +3,7 @@ use std::net::{SocketAddr, TcpStream};
 
 use structopt::StructOpt;
 
-use tcp_demo::{Request, Response, DEFAULT_SERVER_ADDR};
+use tcp_demo_protocol::{Request, Response, DEFAULT_SERVER_ADDR};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "client")]

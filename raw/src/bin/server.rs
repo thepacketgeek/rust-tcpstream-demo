@@ -3,7 +3,7 @@ use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use structopt::StructOpt;
 
-use tcp_demo::{Request, Response, DEFAULT_SERVER_ADDR};
+use tcp_demo_raw::{extract_string_buffered, DEFAULT_SERVER_ADDR};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "server")]
@@ -14,35 +14,18 @@ struct Args {
 }
 
 /// Given a TcpStream:
-/// - Deserialize the request
-/// - Handle the request
-/// - Serialize and write the Response to the stream
+/// - Deserialize the message
+/// - Serialize and write the echo message to the stream
 fn handle_connection(stream: TcpStream) -> io::Result<()> {
     let peer_addr = stream.peer_addr().expect("Stream has peer_addr");
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut writer = BufWriter::new(stream);
 
-    let request = Request::deserialize(&mut reader)?;
-    eprintln!("Incoming {:?} [{}]", request, peer_addr,);
-    let resp = match request {
-        Request::Echo(message) => Response(format!("'{}' from the other side!", message)),
-        Request::Jumble { message, amount } => Response(jumble_message(&message, amount)),
-    };
-
-    resp.serialize(&mut writer)?;
-    // writer.flush()
-    Ok(())
-}
-
-/// Shake the characters around a little bit
-fn jumble_message(message: &str, amount: u16) -> String {
-    let mut chars: Vec<char> = message.chars().collect();
-    // Do some jumbling
-    for i in 1..=amount as usize {
-        let shuffle = i % chars.len();
-        chars.swap(0, shuffle);
-    }
-    chars.into_iter().collect()
+    let message = extract_string_buffered(&mut reader)?;
+    eprintln!("Incoming from {}", peer_addr);
+    let resp = format!("'{}' from the other side!", message);
+    writer.write_all(&resp.as_bytes())?;
+    writer.flush()
 }
 
 fn main() -> io::Result<()> {
