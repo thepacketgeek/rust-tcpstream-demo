@@ -1,0 +1,8 @@
+[package]
+name = "tcp_demo_lines"
+version = "0.1.0"
+authors = ["Mat Wood <mat@thepacketgeek.com>"]
+edition = "2018"
+
+[dependencies]
+structopt = "0.3.14"
