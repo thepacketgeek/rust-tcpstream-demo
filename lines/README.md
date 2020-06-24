@@ -6,6 +6,9 @@ Simply for a little added flair, our server will reverse received `String`s befo
 
 **(Inspired by the now removed [tokio example](https://github.com/tokio-rs/tokio/blob/9d4d076189822e32574f8123efe21c732103f4d4/examples/chat.rs))**
 
+# Detailed Walkthrough
+You can see more details about how this demo was built with the [accompanying blog article](https://thepacketgeek.com/rust-tcpstream-p-02-build-a-linescodec/)
+
 # Running the demo
 From within the 'lines' directory we can start the server, and then in another terminal (tmux pane, ssh session, etc), run the client with a message of your choice
 

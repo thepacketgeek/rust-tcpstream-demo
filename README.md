@@ -1,6 +1,6 @@
 # Ready & Writing data with Rust's TcpStream
 
-This repo contains examples of using Rust's [TcpStream](https://doc.rust-lang.org/stable/std/net/struct.TcpStream.html) to send & receive data between a client and server.
+This repo contains examples of using Rust's [TcpStream](https://doc.rust-lang.org/stable/std/net/struct.TcpStream.html) to send & receive data between a client and server, following a blog series [found here](https://thepacketgeek.com/series/rust-tcpstream/)
 
 The following demos show examples of progressing levels of abstraction for reading & writing data:
 

@@ -12,6 +12,9 @@ Along with a `Response` message for the server to respond with either of:
 
 **(Inspired by pingcap [talent-plan](https://github.com/pingcap/talent-plan/tree/master/courses/rust) workshop)**
 
+# Detailed Walkthrough
+You can see more details about how this demo was built with the [accompanying blog article](https://thepacketgeek.com/rust-tcpstream-p-03-create-a-protocol/)
+
 # Running the demo
 From within the 'protocol' directory we can start the server, and then in another terminal (tmux pane, ssh session, etc), run the client with a message of your choice
 
