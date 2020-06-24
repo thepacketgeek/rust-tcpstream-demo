@@ -2,7 +2,7 @@
 
 For the start of our journey, let's look at what it takes to send and receive bytes with [TcpStream](https://doc.rust-lang.org/stable/std/net/struct.TcpStream.html).
 
-This article is going to build up some concepts that result in a [demo found here](https://github.com/thepacketgeek/rust-tcpstream-demo/tree/master/raw). The working concept is that we want to have a client send some data (a String) to a server that will Echo the back to the client to print out. In further articles, we'll progress this concept to do slightly more interesting things with the data on the server.
+This demo is going to build up some concepts that result in a [demo found here](https://github.com/thepacketgeek/rust-tcpstream-demo/tree/master/raw). The working concept is that we want to have a client send some data (a String) to a server that will Echo the back to the client to print out. In further demos, we'll progress this concept to do slightly more interesting things with the data on the server.
 
 # Writing
 Let's start with our client and figuring out how to send some bytes (String characters) to our server.
@@ -138,7 +138,7 @@ Fortunately though, this is a common enough problem that there's a solution for 
 ## BufRead and BufReader
 The [BufRead](https://doc.rust-lang.org/stable/std/io/trait.BufRead.html) trait and [BufReader](https://doc.rust-lang.org/std/io/struct.BufReader.html) give us some really convenience read capabilities:
 
-- `fill_buf()` and `consume()` - a tag team of methods I'll explain in this article
+- `fill_buf()` and `consume()` - a tag team of methods I'll explain in this demo
 - `read_line()` (or the `Iterator` version: `lines()`) allow us to read by line (String ending with a newline)
   - *You can see this one in action to create a LinesCodec in the [next demo](../lines)*
 

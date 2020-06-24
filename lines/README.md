@@ -1,14 +1,6 @@
-# LinesCodec
-
-This example adds some abstraction around serializing/deserializing `Strings` and interaction with Rust's [TcpStream](https://doc.rust-lang.org/stable/std/net/struct.TcpStream.html).
-
-Simply for a little added flair, our server will reverse received `String`s before echoing them back to the client.
-
-**(Inspired by the now removed [tokio example](https://github.com/tokio-rs/tokio/blob/9d4d076189822e32574f8123efe21c732103f4d4/examples/chat.rs))**
-
 # Building a LinesCodec for TcpStream
 
-In the [previous demo](../raw) we learned how to read & write bytes with our TcpStream, but the calling code had to be aware of that and do the serialization/deserialization.  In this article, we'll continue using `BufRead` and `BufReader` to build:
+In the [previous demo](../raw) we learned how to read & write bytes with our TcpStream, but the calling code had to be aware of that and do the serialization/deserialization.  In this demo, we'll continue using `BufRead` and `BufReader` to build:
 
 - A LinesCodec that abstracts away `String` serialization/deserialization & TcpStream I/O
 - A Client that uses the LinesCodec to send and print returned `String`s
@@ -37,10 +29,10 @@ Our goals for this LinesCodec implementation are to abstract away:
   - The client/server code shouldn't care how the data is represented on the wire
 
 ## A Type to the rescue!
-Starting off with the I/O management abstraction, let's define a new type to own and interact with our `TcpStream`. From the previous article, we know we'll want to use the [BufReader](https://doc.rust-lang.org/std/io/struct.BufReader.html) for its `read_line()` method.
+Starting off with the I/O management abstraction, let's define a new type to own and interact with our `TcpStream`. From the previous demo, we know we'll want to use the [BufReader](https://doc.rust-lang.org/std/io/struct.BufReader.html) for its `read_line()` method.
 
 For writing, we have three options:
-  - Use TcpStream directly, identical to what we did in the previous article
+  - Use TcpStream directly, identical to what we did in the previous demo
   - Use [BufWriter](https://doc.rust-lang.org/std/io/struct.BufWriter.html) which is a good logical jump given our use of `BufReader`
   - Use [LineWriter](https://doc.rust-lang.org/stable/std/io/struct.LineWriter.html) which sounds like an even closer match to what we want
 
@@ -77,7 +69,7 @@ impl LinesCodec {
 ```
 
 ### Reading and Writing
-With the `LinesCodec` struct and it's buffered reader/writers, we can continue our implementation to borrow the reading and writing code from the previous article:
+With the `LinesCodec` struct and it's buffered reader/writers, we can continue our implementation to borrow the reading and writing code from the previous demo:
 
 ```rust
 ...
@@ -180,3 +172,6 @@ Client
 $ cargo run --bin client -- Testing
 gnitseT
 ```
+
+
+**(Inspired by the now removed [tokio example](https://github.com/tokio-rs/tokio/blob/9d4d076189822e32574f8123efe21c732103f4d4/examples/chat.rs))**

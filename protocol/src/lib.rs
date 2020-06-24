@@ -6,6 +6,7 @@
 //! ## Libraries for serialization/deserialization:
 //! [Serde](https://docs.rs/serde/1.0.114/serde/index.html)
 //! [tokio_util::codec](https://docs.rs/tokio-util/0.3.1/tokio_util/codec/index.html)
+//! [bincode](https://github.com/servo/bincode)
 
 use std::convert::From;
 use std::io::{self, Read, Write};

@@ -14,6 +14,6 @@ Step up a level of abstraction using line-based messaging (newline delimited) an
 [Get Started Here](./lines)
 
 ## Message Protocol
-If we want to send more than just lines, we can abstract even further into a protocol of structs, handling serialization & deserialization in the background.
+If we want to send more than just lines, we can abstract even further into a protocol of structs, handling serialization & deserialization with [byteorder](https://docs.rs/byteorder/1.3.4/byteorder/)
 
 [Get Started Here](./protocol)
