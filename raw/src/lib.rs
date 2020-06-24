@@ -5,6 +5,27 @@ use std::io::{self, BufRead};
 pub const DEFAULT_SERVER_ADDR: &str = "127.0.0.1:4000";
 const MESSAGE_BUFFER_SIZE: usize = 32;
 
+/// Given a buffer (in this case, TcpStream), write the bytes
+/// to be transmitted via TCP
+pub fn write_data(stream: &mut impl io::Write, data: &[u8]) -> io::Result<()> {
+    // Here, `write_all()` attempts to write the entire slice, raising an error if it cannot do so
+    stream.write_all(data)?;
+
+    // An alternative is `write()` which will return the number of bytes that *could*
+    // be sent. This can be used if your app has a mechanism to handle this scenario.
+    // E.g. TCP backpressure for high-bandwidth data
+    //
+    // This is an example of what `write_all()` does:
+    // let bytes_to_write = data.len();
+    // let bytes_written = stream.write(data)?;
+    // if bytes_written < bytes_written {
+    //     return Err(Error::new(ErrorKind::Interrupted, "Could not write all data"));
+    // }
+
+    // Signal that we're done writing and the data should be sent (with TCP PSH bit)
+    stream.flush()
+}
+
 /// Given a buffer (in this case, TcpStream), attempt to read
 /// an unknown stream of bytes and decode to a String
 pub fn extract_string_unbuffered(buf: &mut impl io::Read) -> io::Result<String> {

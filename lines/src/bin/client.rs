@@ -1,4 +1,4 @@
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io;
 use std::net::{SocketAddr, TcpStream};
 
 use structopt::StructOpt;

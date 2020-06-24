@@ -1,9 +1,9 @@
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io::{self, BufReader, BufWriter};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use structopt::StructOpt;
 
-use tcp_demo_raw::{extract_string_buffered, DEFAULT_SERVER_ADDR};
+use tcp_demo_raw::{extract_string_buffered, write_data, DEFAULT_SERVER_ADDR};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "server")]
@@ -18,14 +18,12 @@ struct Args {
 /// - Serialize and write the echo message to the stream
 fn handle_connection(stream: TcpStream) -> io::Result<()> {
     let peer_addr = stream.peer_addr().expect("Stream has peer_addr");
+    eprintln!("Incoming from {}", peer_addr);
     let mut reader = BufReader::new(stream.try_clone()?);
     let mut writer = BufWriter::new(stream);
 
     let message = extract_string_buffered(&mut reader)?;
-    eprintln!("Incoming from {}", peer_addr);
-    let resp = format!("'{}' from the other side!", message);
-    writer.write_all(&resp.as_bytes())?;
-    writer.flush()
+    write_data(&mut writer, &message.as_bytes())
 }
 
 fn main() -> io::Result<()> {

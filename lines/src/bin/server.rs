@@ -1,4 +1,4 @@
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use structopt::StructOpt;
@@ -21,11 +21,11 @@ fn handle_connection(stream: TcpStream) -> io::Result<()> {
     eprintln!("Incoming from {}", peer_addr);
     let mut codec = LinesCodec::new(stream)?;
 
-    let resp = codec
+    let message: String = codec
         .read_message()
         // Reverse message
-        .map(|m| m.chars().rev().collect::<String>())?;
-    codec.send_message(&resp)?;
+        .map(|m| m.chars().rev().collect())?;
+    codec.send_message(&message)?;
     Ok(())
 }
 
