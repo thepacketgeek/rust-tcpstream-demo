@@ -20,11 +20,13 @@ pub const DEFAULT_SERVER_ADDR: &str = "127.0.0.1:4000";
 pub enum Request {
     /// Echo a message back
     Echo(String),
-    /// Jumble up a message and return, with given amount of entropy?
+    /// Jumble up a message with given amount of entropy before echoing
     Jumble { message: String, amount: u16 },
 }
 
 /// Encode the Request type as a single byte (as long as we don't exceed 255 types)
+///
+/// We use `&Request` since we don't actually need to own or mutate the request fields
 impl From<&Request> for u8 {
     fn from(req: &Request) -> Self {
         match req {
@@ -92,6 +94,9 @@ impl Request {
 }
 
 /// Response object from server
+///
+/// In the real-world, this would likely be an enum as well to signal Success vs. Error
+/// But since we're showing that capability with the `Request` struct, we'll keep this one simple
 #[derive(Debug)]
 pub struct Response(pub String);
 
