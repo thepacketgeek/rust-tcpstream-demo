@@ -44,6 +44,14 @@ impl From<&Request> for u8 {
 ///
 /// Starts with a type, and then is an arbitrary length of (length/bytes) tuples
 impl Request {
+    /// View the message portion of this request
+    pub fn message(&self) -> &str {
+        match self {
+            Request::Echo(message) => &message,
+            Request::Jumble { message, .. } => &message,
+        }
+    }
+
     /// Serialize Request to bytes (to send to server)
     pub fn serialize(&self, buf: &mut impl Write) -> io::Result<usize> {
         buf.write_u8(self.into())?; // Message Type byte
@@ -73,7 +81,7 @@ impl Request {
         Ok(bytes_written)
     }
 
-    /// Deserialize Request to bytes (to receive from client)
+    /// Deserialize Request from bytes (to receive from TcpStream)
     pub fn deserialize(mut buf: &mut impl Read) -> io::Result<Request> {
         match buf.read_u8()? {
             // Echo
@@ -136,8 +144,62 @@ impl Response {
 
 /// From a given readable buffer, read the next length (u16) and extract the string bytes
 fn extract_string(buf: &mut impl Read) -> io::Result<String> {
+    // byteorder ReadBytesExt
     let length = buf.read_u16::<NetworkEndian>()?;
+    // Given the length of our string, only read in that quantity of bytes
     let mut bytes = vec![0u8; length as usize];
     buf.read_exact(&mut bytes)?;
+    // And attempt to decode it as UTF8
     String::from_utf8(bytes).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid utf8"))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_request_echo_roundtrip() {
+        let req = Request::Echo(String::from("Hello"));
+
+        let mut bytes: Vec<u8> = vec![];
+        req.serialize(&mut bytes).unwrap();
+
+        let mut reader = Cursor::new(bytes);
+        let roundtrip_req = Request::deserialize(&mut reader).unwrap();
+
+        assert!(matches!(roundtrip_req, Request::Echo(_)));
+        assert_eq!(roundtrip_req.message(), "Hello");
+    }
+
+    #[test]
+    fn test_request_jumble_roundtrip() {
+        let req = Request::Jumble {
+            message: String::from("Hello"),
+            amount: 42,
+        };
+
+        let mut bytes: Vec<u8> = vec![];
+        req.serialize(&mut bytes).unwrap();
+
+        let mut reader = Cursor::new(bytes);
+        let roundtrip_req = Request::deserialize(&mut reader).unwrap();
+
+        assert!(matches!(roundtrip_req, Request::Jumble { .. }));
+        assert_eq!(roundtrip_req.message(), "Hello");
+    }
+
+    #[test]
+    fn test_response_roundtrip() {
+        let resp = Response(String::from("Hello"));
+
+        let mut bytes: Vec<u8> = vec![];
+        resp.serialize(&mut bytes).unwrap();
+
+        let mut reader = Cursor::new(bytes);
+        let roundtrip_resp = Response::deserialize(&mut reader).unwrap();
+
+        assert!(matches!(roundtrip_resp, Response(_)));
+        assert_eq!(roundtrip_resp.0, "Hello");
+    }
 }

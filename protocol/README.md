@@ -73,6 +73,8 @@ We already know how to serialize a `String` with `as_bytes()`, and we can use [b
 As we can see above, we need to codify our `Request` types (Echo and Jumble) into a number (`u8`, which allows us up to 255 types!). To help prevent bugs, let's implement `From` for `Request` -> `u8` to have a consistent way of serializing the type:
 
 ```rust
+use std::convert::From;
+
 /// Encode the Request type as a single byte (as long as we don't exceed 255 types)
 ///
 /// We use `&Request` since we don't actually need to own or mutate the request fields
@@ -151,10 +153,88 @@ Now the `Request::Jumble` serialization is just a slight variation (adding the `
 /// ...
 ```
 
-Tada! A serialized `Request` in the bank!
+Tada! A serialized `Request` in the bank! The `Response` struct is even simpler with its single `String` value, so you can see the serialization in the [demo lib.rs](src/lib.rs#L123)
 
 
 ## Deserializing the Request struct
+We already have the byte layout figured out, so deserializing should essentially be the reverse of our `Request::serialize()` method above. `byteorder` also gives us `ReadBytesExt` to add extensions to `Read` that `TcpStream` implements. The trickiest part is reading the variable length `String` and this will happen in a few places for `Request::Echo`, `Request::Jumble`, and `Response` so let's break out this logic into a function:
+
+```rust
+/// From a given readable buffer (TcpStream), read the next length (u16) and extract the string bytes ([u8])
+fn extract_string(buf: &mut impl Read) -> io::Result<String> {
+    // byteorder ReadBytesExt
+    let length = buf.read_u16::<NetworkEndian>()?;
+
+    // Given the length of our string, only read in that quantity of bytes
+    let mut bytes = vec![0u8; length as usize];
+    buf.read_exact(&mut bytes)?;
+
+    // And attempt to decode it as UTF8
+    String::from_utf8(bytes).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid utf8"))
+}
+```
+
+
+
+Our `deserialize()` method should be straight-forward to read now, especially with `extract_string` at our disposal:
+
+```rust
+use std::io::{self, Read};
+use byteorder::{NetworkEndian, ReadBytesExt};
+
+
+impl Request {
+    /// Deserialize Request from bytes (to receive from TcpStream)
+    /// returning a `Request` struct
+    pub fn deserialize(mut buf: &mut impl Read) -> io::Result<Request> {
+        /// We'll match the same `u8` that is used to recognize which request type this is
+        match buf.read_u8()? {
+            // Echo
+            1 => Ok(Request::Echo(extract_string(&mut buf)?)),
+            // Jumble
+            2 => {
+                let message = extract_string(&mut buf)?;
+                // amount length is not used since we know it's 2 bytes
+                let _amount_len = buf.read_u16::<NetworkEndian>()?;
+                let amount = buf.read_u16::<NetworkEndian>()?;
+                Ok(Request::Jumble { message, amount })
+            }
+            _ => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "Invalid Request Type",
+            )),
+        }
+    }
+
+}
+```
+
+Wow! We now have the ability to test round-tripping of our structs!
+
+```rust
+use crate::*;
+use std::io::Cursor;
+
+#[test]
+fn test_request_roundtrip() {
+    let req = Request::Echo(String::from("Hello"));
+
+    let mut bytes: Vec<u8> = vec![];
+    req.serialize(&mut bytes).unwrap();
+
+    let mut reader = Cursor::new(bytes); // Simulating our TcpStream
+    let roundtrip_req = Request::deserialize(&mut reader).unwrap();
+
+    assert!(matches!(roundtrip_req, Request::Echo(_)));
+    assert_eq!(roundtrip_req.message(), "Hello");
+}
+```
+
+# Using our new Protocol
+Well, if you're still with me here, congrats! That was a lot of work but you're about to see how it all pays off when we use the message structs in our client and server.
+
+## In the Client
+
 
 
 # Running the demo
