@@ -10,10 +10,25 @@
 
 use std::convert::From;
 use std::io::{self, Read, Write};
+use std::net::{SocketAddr, TcpStream};
 
 use byteorder::{NetworkEndian, ReadBytesExt, WriteBytesExt};
 
 pub const DEFAULT_SERVER_ADDR: &str = "127.0.0.1:4000";
+
+/// Trait for something that can be converted to bytes (&[u8])
+pub trait Serialize {
+    /// Serialize to a `Write`able buffer
+    fn serialize(&self, buf: &mut impl Write) -> io::Result<usize>;
+}
+/// Trait for something that can be converted from bytes (&[u8])
+pub trait Deserialize {
+    /// The type that this deserializes to
+    type Output;
+
+    /// Deserialize from a `Read`able buffer
+    fn deserialize(buf: &mut impl Read) -> io::Result<Self::Output>;
+}
 
 /// Request object (client -> server)
 #[derive(Debug)]
@@ -51,9 +66,11 @@ impl Request {
             Request::Jumble { message, .. } => &message,
         }
     }
+}
 
+impl Serialize for Request {
     /// Serialize Request to bytes (to send to server)
-    pub fn serialize(&self, buf: &mut impl Write) -> io::Result<usize> {
+    fn serialize(&self, buf: &mut impl Write) -> io::Result<usize> {
         buf.write_u8(self.into())?; // Message Type byte
         let mut bytes_written: usize = 1;
         match self {
@@ -80,9 +97,13 @@ impl Request {
         }
         Ok(bytes_written)
     }
+}
+
+impl Deserialize for Request {
+    type Output = Request;
 
     /// Deserialize Request from bytes (to receive from TcpStream)
-    pub fn deserialize(mut buf: &mut impl Read) -> io::Result<Request> {
+    fn deserialize(mut buf: &mut impl Read) -> io::Result<Self::Output> {
         match buf.read_u8()? {
             // Echo
             1 => Ok(Request::Echo(extract_string(&mut buf)?)),
@@ -124,19 +145,24 @@ impl Response {
     pub fn message(&self) -> &str {
         &self.0
     }
+}
 
+impl Serialize for Response {
     /// Serialize Response to bytes (to send to client)
     ///
     /// Returns the number of bytes written
-    pub fn serialize(&self, buf: &mut impl Write) -> io::Result<usize> {
+    fn serialize(&self, buf: &mut impl Write) -> io::Result<usize> {
         let resp_bytes = self.0.as_bytes();
         buf.write_u16::<NetworkEndian>(resp_bytes.len() as u16)?;
         buf.write_all(&resp_bytes)?;
         Ok(3 + resp_bytes.len()) // Type + len + bytes
     }
+}
 
+impl Deserialize for Response {
+    type Output = Response;
     /// Deserialize Response to bytes (to receive from server)
-    pub fn deserialize(mut buf: &mut impl Read) -> io::Result<Response> {
+    fn deserialize(mut buf: &mut impl Read) -> io::Result<Self::Output> {
         let value = extract_string(&mut buf)?;
         Ok(Response(value))
     }
@@ -151,6 +177,44 @@ fn extract_string(buf: &mut impl Read) -> io::Result<String> {
     buf.read_exact(&mut bytes)?;
     // And attempt to decode it as UTF8
     String::from_utf8(bytes).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "Invalid utf8"))
+}
+
+/// Abstracted Protocol that wraps a TcpStream and manages
+/// sending & receiving of messages
+pub struct Protocol {
+    reader: io::BufReader<TcpStream>,
+    stream: TcpStream,
+}
+
+impl Protocol {
+    /// Wrap a TcpStream with Protocol
+    pub fn with_stream(stream: TcpStream) -> io::Result<Self> {
+        Ok(Self {
+            reader: io::BufReader::new(stream.try_clone()?),
+            stream,
+        })
+    }
+
+    /// Establish a connection, wrap stream in BufReader/Writer
+    pub fn connect(dest: SocketAddr) -> io::Result<Self> {
+        let stream = TcpStream::connect(dest)?;
+        eprintln!("Connecting to {}", dest);
+        Self::with_stream(stream)
+    }
+
+    /// Serialize a message to the server and write it to the TcpStream
+    pub fn send_message(&mut self, message: &impl Serialize) -> io::Result<()> {
+        message.serialize(&mut self.stream)?;
+        self.stream.flush()
+    }
+
+    /// Read a message from the inner TcpStream
+    ///
+    /// NOTE: Will block until there's data to read (or deserialize fails with io::ErrorKind::Interrupted)
+    ///       so only use when a message is expected to arrive
+    pub fn read_message<T: Deserialize>(&mut self) -> io::Result<T::Output> {
+        T::deserialize(&mut self.reader)
+    }
 }
 
 #[cfg(test)]

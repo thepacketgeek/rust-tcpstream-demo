@@ -174,8 +174,6 @@ fn extract_string(buf: &mut impl Read) -> io::Result<String> {
 }
 ```
 
-
-
 Our `deserialize()` method should be straight-forward to read now, especially with `extract_string` at our disposal:
 
 ```rust
@@ -233,8 +231,26 @@ fn test_request_roundtrip() {
 # Using our new Protocol
 Well, if you're still with me here, congrats! That was a lot of work but you're about to see how it all pays off when we use the message structs in our client and server.
 
-## In the Client
+I'll leave it up as an exercise to check out the [full protocol implementation](src/lib.rs) where we add `Serialize` and `Deserialize` traits for our methods above and make using our protocol as easy as:
 
+```rust
+use std::io;
+
+fn main() -> io::Request<()> {
+    let req = Request::Jumble {
+        message: "Hello",
+        amount: 80,
+    };
+    
+    Protocol::connect("127.0.0.1:4000")
+        .and_then(|mut client| {
+            client.send_message(&req)?;
+            Ok(client)
+        })
+        .and_then(|mut client| client.read_message::<Response>())
+        .map(|resp| println!("{}", resp.message()))
+}
+```
 
 
 # Running the demo

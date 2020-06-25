@@ -1,9 +1,9 @@
-use std::io::{self, BufReader, BufWriter, Write};
+use std::io;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 
 use structopt::StructOpt;
 
-use tcp_demo_protocol::{Request, Response, DEFAULT_SERVER_ADDR};
+use tcp_demo_protocol::{Protocol, Request, Response, DEFAULT_SERVER_ADDR};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "server")]
@@ -19,18 +19,16 @@ struct Args {
 /// - Serialize and write the Response to the stream
 fn handle_connection(stream: TcpStream) -> io::Result<()> {
     let peer_addr = stream.peer_addr().expect("Stream has peer_addr");
-    let mut reader = BufReader::new(stream.try_clone()?);
-    let mut writer = BufWriter::new(stream);
+    let mut protocol = Protocol::with_stream(stream)?;
 
-    let request = Request::deserialize(&mut reader)?;
-    eprintln!("Incoming {:?} [{}]", request, peer_addr,);
+    let request = protocol.read_message::<Request>()?;
+    eprintln!("Incoming {:?} [{}]", request, peer_addr);
     let resp = match request {
         Request::Echo(message) => Response(format!("'{}' from the other side!", message)),
         Request::Jumble { message, amount } => Response(jumble_message(&message, amount)),
     };
 
-    resp.serialize(&mut writer)?;
-    writer.flush()
+    protocol.send_message(&resp)
 }
 
 /// Shake the characters around a little bit
