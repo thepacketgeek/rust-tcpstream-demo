@@ -78,3 +78,27 @@ pub fn extract_string_buffered(mut buf: &mut impl io::Read) -> io::Result<String
         )
     })
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn test_extract_string_buffered() {
+        let message = String::from("Hello");
+        let mut reader = Cursor::new(message.as_bytes());
+        let result = extract_string_buffered(&mut reader).unwrap();
+
+        assert_eq!(message, result);
+    }
+
+    #[test]
+    fn test_extract_string_unbuffered() {
+        let message = String::from("Hello");
+        let mut reader = Cursor::new(message.as_bytes());
+        let result = extract_string_unbuffered(&mut reader).unwrap();
+
+        assert_eq!(message, result);
+    }
+}

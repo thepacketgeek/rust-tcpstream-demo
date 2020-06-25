@@ -272,5 +272,3 @@ $ cargo run --bin client -- "This is my message" -j 100
 Connecting to 127.0.0.1:4000
 issageThis s my me
 ```
-
-**(Inspired by pingcap [talent-plan](https://github.com/pingcap/talent-plan/tree/master/courses/rust) workshop)**

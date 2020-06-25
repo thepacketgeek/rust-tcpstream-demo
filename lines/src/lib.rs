@@ -21,7 +21,7 @@ impl LinesCodec {
 
     /// Write this line (with a '\n' suffix) to the TcpStream
     pub fn send_message(&mut self, message: &str) -> io::Result<()> {
-        self.writer.write(&message.as_bytes())?;
+        self.writer.write_all(&message.as_bytes())?;
         // This will also signal a `writer.flush()` for us!
         self.writer.write(&['\n' as u8])?;
         Ok(())
