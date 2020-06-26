@@ -1,11 +1,11 @@
 # Create a Messaging Protocol for TcpStream
 
-In this series so far we've learned how to [read & write bytes](../raw) with our TcpStream and then how to [abstract over that with a `LinesCodec`](../lines) for sending and receiving `String` messages. In this demo, we'll look into what it takes to build a custom protocol for message passing more than a single type of thing (like a `String`).
+In this series so far we've learned how to [read & write bytes](../raw) with `TcpStream` and then how to [abstract over that with a `LinesCodec`](../lines) for sending and receiving `String` messages. In this demo we'll look into what it takes to build a custom protocol for message passing more than a single type of thing (like a `String`).
 
-# Defining our Messages
+# Defining our Message Structs
 To give our client and server more options for communicating we'll create:
 
-- A `Request` message that allow the client to request either:
+- A `Request` message that allow the client to request *either*:
   - Echo a string
   - Jumble a string with a specified amount of jumbling entropy
 - A `Response` message for the server to respond with the successfully echo/jumbled `String`
@@ -16,7 +16,7 @@ To give our client and server more options for communicating we'll create:
 pub enum Request {
     /// Echo a message back
     Echo(String),
-    /// Jumble up a message with given amount of entropy before echoing
+    /// Jumble up a message with given amount of entropy before returning
     Jumble { message: String, amount: u16 },
 }
 
@@ -29,20 +29,20 @@ pub struct Response(pub String);
 ```
 
 # Serialization
-In the previous demos, we relied on `String::as_bytes()` to serialize the string characters to the byte slice `&[u8]` we passed to `TcpStream::write_all()`. The structs defined above don't have any default serialization capabilities so this example focuses on how to implement that ourselves.
+In the previous demos, we relied on `String::as_bytes()` to serialize the `String` characters to the byte slice (`&[u8]`) we pass to `TcpStream::write_all()`. The structs defined above don't have any default serialization capabilities so this example focuses on how to implement that ourselves.
 
 
 ## Serialization/Deserialization Libraries
-**Quick detour**: As you'll soon find out, serializing our custom structs is a lot of work. The good news is that there are some really incredible, performant, and battle-tested libraries to make doing this easier! It's fun to see how this might be implemented, but I highly recommend checking out these libraries for your serialization needs:
+**Quick detour**: As you'll soon find out, serializing our custom structs is a lot of work. The good news is that there are some really incredible, performant, and battle-tested libraries to make doing this easier! It's fun to study how this can be implemented, but I highly recommend checking out these libraries for your actual serialization needs:
 
 - [Serde](https://docs.rs/serde/1.0.114/serde/index.html)
 - [tokio_util::codec](https://docs.rs/tokio-util/0.3.1/tokio_util/codec/index.html)
 - [bincode](https://github.com/servo/bincode)
 
 ## Serializing the Request struct
-Serialization & Deserialization needs to be **symmetric** (i.e., it round-trips) so that the struct serialized by the client is deserialized by the server back into an identical struct:
+Serialization & Deserialization needs to be **symmetric** (i.e., it round-trips) so that the struct serialized by the client is deserialized by the server back into an identical struct.
 
-Serializing Symmetry (round-trip) pseudo-code
+Serializing Symmetry (round-trip) pseudo-code:
 ```rust
 let message = Request { ... };
 
@@ -53,7 +53,7 @@ let roundtripped_message = deserialize_message(serialize_message(&message));
 assert_eq!(message, roundtripped_message);
 ```
 
-In order to serialize `Request` we need to decide what it looks like on the wire (as a `[u8]`). Since `Request` has two "types" (Echo and Jumble), we'll need to encode that type to help the deserialization know what it's looking for. Here's an approach for the `Request` byte layout:
+In order to serialize `Request` we need to decide what it looks like on the wire (as a `[u8]`). Since `Request` has two "types" (Echo and Jumble), we'll need to encode that type info to instruct the deserialization code correctly. Here is an approach for the `Request` byte layout:
 
 ```
 |    u8    |     u16     |     [u8]      | ... u16    |   ... [u8]       |
@@ -61,16 +61,17 @@ In order to serialize `Request` we need to decide what it looks like on the wire
            ^---    struct field        --^--   possibly more fields?   --^-- ...
 ```
 
-- **type**: A codified representation of the `Request` type (E.g. Echo == 0, Jumble == 1)
+- **type**: A codified representation of the `Request` type
+  - E.g. Echo == 1, Jumble == 2
 - **length**/**bytes**: The **L**ength and **V**alue from **T**ype-Length-Value [TLV]
-  - Each message struct has specific field types, but TLV is useful when fields are variadic
+  - Each message struct has specific field types so we can get away with only LV, but TLV is useful when fields are variadic and not derivable otherwise
 - **possibly more fields**:
-  - Again, each message struct knows it's fields for deserialization, so these length/byte groups can go on for each struct field when needed
+  - Again, each message struct knows it's fields for deserialization, so these length/byte groups can repeat for each member field when needed (like in the case of Jumble)
 
-We already know how to serialize a `String` with `as_bytes()`, and we can use [byteorder](https://crates.io/crates/byteorder) to serialize our numbers with the correct [Endianness](https://en.wikipedia.org/wiki/Endianness) (spoiler: `BigEndian`, aliased as `NetworkEndian`). Let's walk through the serialization steps:
+We know how to serialize a `String` with `as_bytes()`, but for number values we can use [byteorder](https://crates.io/crates/byteorder) to serialize with the correct [Endianness](https://en.wikipedia.org/wiki/Endianness) (spoiler: `BigEndian`, aliased as `NetworkEndian`). Let's walk through the serialization steps:
 
 ### Request Type
-As we can see above, we need to codify our `Request` types (Echo and Jumble) into a number (`u8`, which allows us up to 255 types!). To help prevent bugs, let's implement `From` for `Request` -> `u8` to have a consistent way of serializing the type:
+As we can see above we need to codify our `Request` types (Echo and Jumble) into a number (`u8`, which allows us up to 255 types!). To make this definition clear we can implement `From` for `Request` -> `u8` to have a consistent way of serializing the type:
 
 ```rust
 use std::convert::From;
@@ -89,7 +90,7 @@ impl From<&Request> for u8 {
 ```
 
 ### Request Fields
-Let's finish the building blocks for serialize the `Request` with examples for writing the **length**/**value** for `String` and numbers:
+Let's finish the building blocks for serializing the `Request` with examples for writing the **length**/**value** for `String` and numbers:
 
 `String` is straightforward and we've used `as_bytes()` in previous demos, and `byteorder` adds extension methods to `Write` for numbers:
 ```rust
@@ -153,11 +154,11 @@ Now the `Request::Jumble` serialization is just a slight variation (adding the `
 /// ...
 ```
 
-Tada! A serialized `Request` in the bank! The `Response` struct is even simpler with its single `String` value, so you can see the serialization in the [demo lib.rs](src/lib.rs#L123)
+Tada! A serialized `Request` in the bank! The `Response` struct is even simpler with its single `String` value, so you can review the serialization code in the [demo lib.rs](src/lib.rs#L123)
 
 
 ## Deserializing the Request struct
-We already have the byte layout figured out, so deserializing should essentially be the reverse of our `Request::serialize()` method above. `byteorder` also gives us `ReadBytesExt` to add extensions to `Read` that `TcpStream` implements. The trickiest part is reading the variable length `String` and this will happen in a few places for `Request::Echo`, `Request::Jumble`, and `Response` so let's break out this logic into a function:
+We already have the byte layout figured out so deserializing should essentially be the reverse of our `Request::serialize()` method above. `byteorder` also gives us `ReadBytesExt` to add extensions to `Read` that `TcpStream` implements. The trickiest part is reading the variable length `String` and this will happen in a few places for `Request::Echo`, `Request::Jumble`, and `Response` so let's break out this logic into a function:
 
 ```rust
 /// From a given readable buffer (TcpStream), read the next length (u16) and extract the string bytes ([u8])
@@ -174,7 +175,7 @@ fn extract_string(buf: &mut impl Read) -> io::Result<String> {
 }
 ```
 
-Our `deserialize()` method should be straight-forward to read now, especially with `extract_string` at our disposal:
+Our `deserialize()` method should be straight-forward to read now especially with `extract_string` at our disposal:
 
 ```rust
 use std::io::{self, Read};
@@ -229,7 +230,7 @@ fn test_request_roundtrip() {
 ```
 
 # Using our new Protocol
-Well, if you're still with me here, congrats! That was a lot of work but you're about to see how it all pays off when we use the message structs in our client and server.
+If you're still with me here, congrats! That was a lot of work and you're about to see how it all pays off when we use the message structs in our client and server.
 
 I'll leave it up as an exercise to check out the [full protocol implementation](src/lib.rs) where we add `Serialize` and `Deserialize` traits for our methods above and make using our protocol as easy as:
 
@@ -254,7 +255,7 @@ fn main() -> io::Request<()> {
 
 
 # Running the demo
-From within the 'protocol' directory we can start the server, and then in another terminal (tmux pane, ssh session, etc), run the client with a message of your choice
+From within this `./protocol` directory we can start the server, and then in another terminal (tmux pane, ssh session, etc), run the client with a message of your choice
 
 Server
 ```sh

@@ -2,9 +2,9 @@
 
 In the [previous demo](../raw) we learned how to read & write bytes with our TcpStream, but the calling code had to be aware of that and do the serialization/deserialization.  In this demo, we'll continue using `BufRead` and `BufReader` to build:
 
-- A LinesCodec that abstracts away `String` serialization/deserialization & TcpStream I/O
-- A Client that uses the LinesCodec to send and print returned `String`s
-- A Server that also uses the LinesCodec and reverses Strings before echoing them back
+- A `LinesCodec` that abstracts away `String` serialization/deserialization & TcpStream I/O
+- A client that uses the `LinesCodec` to send and print returned `String`s
+- A server that also uses the `LinesCodec` and reverses `String`s before echoing them back
 
 Server
 ```sh
@@ -24,14 +24,14 @@ gnitseT
 Our goals for this LinesCodec implementation are to abstract away:
 - `TcpStream` reading & writing
   - We know enough about this now to know that the client & server shouldn't worry about the correct incantation to send & receive data
-  - Even copy/pasting the code around is bound to cause an issue (like a forgotten `stream.flush()`!)
+  - Even copy/pasting the code around is bound to cause an issue (like a forgotten `stream.flush()`)
 - `String` serialization & deserialization
-  - The client/server code shouldn't care how the data is represented on the wire
+  - The client/server code shouldn't care how the data is represented on the wire, our codec will take care of that!
 
 ## A Type to the rescue!
-Starting off with the I/O management abstraction, let's define a new type to own and interact with our `TcpStream`. From the previous demo, we know we'll want to use the [BufReader](https://doc.rust-lang.org/std/io/struct.BufReader.html) for its `read_line()` method.
+Starting off with the I/O management abstraction, let's define a new type to own and interact with `TcpStream`. From the previous demo, we know we'll want to use the [BufReader](https://doc.rust-lang.org/std/io/struct.BufReader.html) and its `read_line()` method for reading data.
 
-For writing, we have three options:
+For writing data, we have three options:
   - Use TcpStream directly, identical to what we did in the previous demo
   - Use [BufWriter](https://doc.rust-lang.org/std/io/struct.BufWriter.html) which is a good logical jump given our use of `BufReader`
   - Use [LineWriter](https://doc.rust-lang.org/stable/std/io/struct.LineWriter.html) which sounds like an even closer match to what we want
@@ -39,18 +39,18 @@ For writing, we have three options:
 
 I'm choosing to use `LineWriter` because it seems like a better approach to what we're wanting to do, based of of its documentation:
 
-> Wraps a writer and buffers output to it, flushing whenever a newline (0x0a, '\n') is detected.
+> Wraps a writer and buffers output to it, flushing whenever a newline (0x0a, `\n`) is detected.
 > 
-> The BufWriter struct wraps a writer and buffers its output. But it only does this batched write when it goes out of scope, or when the internal buffer is full. Sometimes, you'd prefer to write each line as it's completed, rather than the entire buffer at once. Enter LineWriter. It does exactly that.
+> The `BufWriter` struct wraps a writer and buffers its output. But it only does this batched write when it goes out of scope, or when the internal buffer is full. Sometimes, you'd prefer to write each line as it's completed, rather than the entire buffer at once. Enter LineWriter. It does exactly that.
 
-Great! Let's define our type and see how we can instantiate a new instance:
+Great! Let's define our type and define `LinesCodec::new()` to build new instances:
 
 ```rust
 use std::io::{self, BufRead, Write};
 use std::net::TcpStream;
 
 pub struct LinesCodec {
-    // Our buffere reader & writer, all ready to go
+    // Our buffered reader & writers
     reader: io::BufReader<TcpStream>,
     writer: io::LineWriter<TcpStream>,
 }
@@ -62,14 +62,13 @@ impl LinesCodec {
         // We can clone the stream to simulate splitting Tx & Rx with `try_clone()`
         let writer = io::LineWriter::new(stream.try_clone()?);
         let reader = io::BufReader::new(stream);
-        // And then return our new instance
         Ok(Self { reader, writer })
     }
 }
 ```
 
 ### Reading and Writing
-With the `LinesCodec` struct and it's buffered reader/writers, we can continue our implementation to borrow the reading and writing code from the previous demo:
+With the `LinesCodec` struct and its buffered reader/writers, we can continue our implementation to borrow the reading and writing code from the previous demo:
 
 ```rust
 ...
@@ -94,7 +93,7 @@ impl LinesCodec {
 ```
 
 # Using LinesCodec in the client
-With the `TcpStream` out of the way, let's refactor our client code and see how easy this can be:
+With the `TcpStream` out of the way, let's refactor our client code from the previous demo and see how easy this can be:
 
 ```rust
 use std::io;
@@ -122,10 +121,10 @@ fn main() -> io::Result<()> {
 ```
 
 # Using LinesCodec in the server
-And now some very similar work to update our server to use `LinesCodec`. We'll define a `handle_connection` function that:
-- Takes an owned `TcpStream` and wraps it in `LinesCodec`
-- Receives a message from the client and reverse the string
-- Sends the message back to the client
+And now we have some very similar work to update our server to use `LinesCodec`. We'll define a `handle_connection` function that:
+- Takes ownership of a `TcpStream` and wraps it in `LinesCodec`
+- Receives a message (`String`) from the client and reverses it
+- Sends the message back to the client, again using `LinesCodec`
 
 ```rust
 use std::io;
@@ -151,14 +150,12 @@ fn handle_connection(stream: TcpStream) -> io::Result<()> {
 }
 ```
 
-Wow, using the codec makes the business logic code much clearer and there are fewer opportunities to forget adding newlines or 
+Using the codec makes the business logic code much clearer and there are fewer opportunities to mis-manage newlines or forget `flush()`. Check out the [client](src/bin/client.rs) and [server](src/bin/server.rs) code for a full runnable example.
 
-Check out the [client](src/bin/client.rs) and [server](src/bin/server.rs) code for a full example.
-
-In the [next demo](../protocol) we dive even deeper to build a custom protocol with our own serialization/deserialization scheme!
+In the [next demo](../protocol) we dive even deeper to build a custom protocol with our own serialization/deserialization!
 
 # Running the demo
-From within the 'lines' directory we can start the server, and then in another terminal (tmux pane, ssh session, etc), run the client with a message of your choice
+From within this `./lines` directory we can start the server, and then in another terminal (tmux pane, ssh session, etc), run the client with a message of your choice
 
 Server
 ```sh
