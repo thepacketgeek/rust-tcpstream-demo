@@ -18,7 +18,7 @@ pub fn write_data(stream: &mut impl io::Write, data: &[u8]) -> io::Result<()> {
     // This is an example of what `write_all()` does:
     // let bytes_to_write = data.len();
     // let bytes_written = stream.write(data)?;
-    // if bytes_written < bytes_written {
+    // if bytes_written < bytes_to_write {
     //     return Err(Error::new(ErrorKind::Interrupted, "Could not write all data"));
     // }
 
